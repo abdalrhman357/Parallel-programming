@@ -26,12 +26,10 @@ class OrderController extends Controller
         $total += $product->price * $item->quantity;
     }
 
-    // التحقق من الرصيد
     if ($user->wallet_balance < $total) {
         return response()->json(['message' => 'Not enough balance'], 400);
     }
 
-    // خصم الرصيد
     $user->wallet_balance -= $total;
     $user->save();
 
@@ -52,7 +50,6 @@ class OrderController extends Controller
             'price' => $product->price
         ]);
 
-        // إدارة المخزون
         $product->stock_quantity -= $item->quantity;
         $product->save();
     }

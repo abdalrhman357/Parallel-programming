@@ -9,33 +9,20 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
-/**
- * ============================================================
- * GenerateInvoiceJob - مهمة إصدار الفاتورة
- * ============================================================
- */
+
 class GenerateInvoiceJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    /**
-     * عدد المحاولات عند الفشل
-     */
+
     public int $tries = 3;
 
-    /**
-     * وقت الانتظار بين المحاولات
-     */
     public int $backoff = 5;
 
-    /**
-     * أقصى وقت للتنفيذ
-     */
+
     public int $timeout = 30;
 
-    /**
-     * بيانات الطلب
-     */
+
     public function __construct(
         public int $orderId,
         public int $userId,
@@ -43,12 +30,9 @@ class GenerateInvoiceJob implements ShouldQueue
         public string $orderStatus,
     ) {}
 
-    /**
-     * تنفيذ المهمة
-     */
+
     public function handle(): void
     {
-        // تسجيل بداية المعالجة
         Log::channel('daily')->info(
             'GenerateInvoiceJob: بدء إصدار الفاتورة',
             [
@@ -59,13 +43,10 @@ class GenerateInvoiceJob implements ShouldQueue
             ]
         );
 
-        // بناء بيانات الفاتورة
         $invoiceData = $this->buildInvoice();
 
-        // محاكاة معالجة ثقيلة
         sleep(2);
 
-        // تسجيل النجاح
         Log::channel('daily')->info(
             'GenerateInvoiceJob: تم إصدار الفاتورة بنجاح',
             [
@@ -76,9 +57,7 @@ class GenerateInvoiceJob implements ShouldQueue
         );
     }
 
-    /**
-     * إنشاء بيانات الفاتورة
-     */
+
     private function buildInvoice(): array
     {
         return [
@@ -102,9 +81,7 @@ class GenerateInvoiceJob implements ShouldQueue
         ];
     }
 
-    /**
-     * عند الفشل النهائي
-     */
+
     public function failed(\Throwable $exception): void
     {
         Log::channel('daily')->error(

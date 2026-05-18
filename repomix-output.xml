@@ -1,0 +1,845 @@
+This file is a merged representation of a subset of the codebase, containing specifically included files, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of a subset of the repository's contents that is considered the most important context.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Only files matching these patterns are included: tests
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+tests/Feature/ExampleTest.php
+tests/k6/after_protection.js
+tests/k6/after_queue.js
+tests/k6/batch-after.js
+tests/k6/batch-before.js
+tests/k6/before_protection.js
+tests/k6/before_queue.js
+tests/k6/load-distribution.js
+tests/k6/metrics-helper.js
+tests/k6/race-condition.js
+tests/TestCase.php
+tests/Unit/ExampleTest.php
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="tests/Feature/ExampleTest.php">
+<?php
+
+namespace Tests\Feature;
+
+// use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    /**
+     * A basic test example.
+     */
+    public function test_the_application_returns_a_successful_response(): void
+    {
+        $response = $this->get('/');
+
+        $response->assertStatus(200);
+    }
+}
+</file>
+
+<file path="tests/k6/after_protection.js">
+/**
+ * ============================================================
+ * اختبار بعد الحماية - مع Rate Limit + Concurrency Limit
+ * ============================================================
+ * k6 run after_protection.js
+ * ============================================================
+ */
+
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+import { Rate, Counter, Trend } from 'k6/metrics';
+
+// ─── Metrics ──────────────────────────────────────────────────────────────────
+const successfulRequests       = new Rate('successful_requests');
+const rateLimitedRequests      = new Rate('rate_limited_requests');
+const capacityRejectedRequests = new Rate('capacity_rejected_requests');
+const serverErrorRequests      = new Rate('server_error_requests');
+const successResponseTime      = new Trend('success_response_time');
+const totalProcessed           = new Counter('total_processed');
+
+// ─── الإعداد: نفس الضغط - 100 مستخدم متزامن ─────────────────────────────────
+export const options = {
+    scenarios: {
+        with_protection: {
+            executor: 'ramping-vus',
+            startVUs: 0,
+            stages: [
+                { duration: '5s',  target: 50  },
+                { duration: '10s', target: 100 },
+                { duration: '10s', target: 100 },
+                { duration: '5s',  target: 0   },
+            ],
+        },
+    },
+    thresholds: {
+        // الطلبات الناجحة يجب أن تكون سريعة
+        success_response_time: ['p(95)<2000'],
+
+        // يجب أن لا يكون هناك أخطاء 500 إطلاقاً
+        server_error_requests: ['rate<0.01'],
+    },
+};
+
+// ─── الدالة الرئيسية ──────────────────────────────────────────────────────────
+export default function () {
+
+    const response = http.post(
+        'http://127.0.0.1:8000/api/checkoutWithLock',
+        JSON.stringify({}),
+        { headers: { 'Content-Type': 'application/json' } }
+    );
+
+    totalProcessed.add(1);
+
+    const isSuccess     = response.status === 200 || response.status === 201;
+    const isRateLimited = response.status === 429;
+    const isAtCapacity  = response.status === 503;
+    const isServerError = response.status === 500;
+
+    successfulRequests.add(isSuccess ? 1 : 0);
+    rateLimitedRequests.add(isRateLimited ? 1 : 0);
+    capacityRejectedRequests.add(isAtCapacity ? 1 : 0);
+    serverErrorRequests.add(isServerError ? 1 : 0);
+
+    if (isSuccess) {
+        successResponseTime.add(response.timings.duration);
+    }
+
+    // ─── قراءة الـ Headers بكل الاحتمالات ────────────────────────────────────
+    const concurrent    = response.headers['X-Concurrent-Requests']
+                       || response.headers['x-concurrent-requests']
+                       || 'N/A';
+
+    const rateLimitLeft = response.headers['X-Ratelimit-Remaining']
+                       || response.headers['X-RateLimit-Remaining']
+                       || response.headers['x-ratelimit-remaining']
+                       || 'N/A';
+
+    const serverTime    = response.headers['X-Server-Time-Ms']
+                       || response.headers['x-server-time-ms']
+                       || 'N/A';
+
+    check(response, {
+        '✅ النظام يستجيب دائماً'     : (r) => r.status !== 0,
+        '✅ لا انهيار - لا أخطاء 500' : (r) => r.status !== 500,
+        '✅ الرد منضبط (200/429/503)' : (r) => [200, 201, 400, 429, 503].includes(r.status),
+    });
+
+    if (Math.random() < 0.1) {
+        console.log(
+            `[AFTER] Status: ${response.status} | ` +
+            `Time: ${response.timings.duration.toFixed(0)}ms | ` +
+            `Concurrent: ${concurrent} | ` +
+            `RateLimit Remaining: ${rateLimitLeft} | ` +
+            `Server Time: ${serverTime}ms`
+        );
+    }
+
+    sleep(0.1);
+}
+
+// ─── التقرير النهائي ──────────────────────────────────────────────────────────
+export function handleSummary(data) {
+
+    const m = data.metrics;
+
+    const totalReqs       = m.http_reqs?.values?.count                          || 0;
+    const avgDuration     = m.http_req_duration?.values?.avg?.toFixed(2)        || 'N/A';
+    const p95Duration     = m.http_req_duration?.values?.['p(95)']?.toFixed(2)  || 'N/A';
+    const maxDuration     = m.http_req_duration?.values?.max?.toFixed(2)        || 'N/A';
+    const successRate     = ((m.successful_requests?.values?.rate        || 0) * 100).toFixed(1);
+    const rateLimitRate   = ((m.rate_limited_requests?.values?.rate      || 0) * 100).toFixed(1);
+    const capacityRate    = ((m.capacity_rejected_requests?.values?.rate || 0) * 100).toFixed(1);
+    const serverErrorRate = ((m.server_error_requests?.values?.rate      || 0) * 100).toFixed(1);
+    const successAvgTime  = m.success_response_time?.values?.avg?.toFixed(2)         || 'N/A';
+    const successP95Time  = m.success_response_time?.values?.['p(95)']?.toFixed(2)   || 'N/A';
+
+    const report = `
+╔══════════════════════════════════════════════════════════════════╗
+║      ✅ النتيجة بعد الحماية - مع Resource Management            ║
+╠══════════════════════════════════════════════════════════════════╣
+║  الـ Endpoint : /api/checkoutWithLock (مع Middlewares)          ║
+║  عدد المستخدمين المتزامنين: 100                                 ║
+║  الحماية المطبقة:                                               ║
+║  ├─ RateLimitMiddleware   : 10 طلبات/دقيقة لكل IP              ║
+║  └─ ConcurrencyMiddleware : 5 عمليات متزامنة كحد أقصى          ║
+╠══════════════════════════════════════════════════════════════════╣
+║  📊 إحصائيات عامة (كل الطلبات)                                  ║
+║  ├─ إجمالي الطلبات        : ${String(totalReqs).padEnd(33)}║
+║  ├─ متوسط زمن الاستجابة   : ${String(avgDuration + ' ms').padEnd(33)}║
+║  ├─ P95 زمن الاستجابة     : ${String(p95Duration + ' ms').padEnd(33)}║
+║  └─ أقصى زمن استجابة      : ${String(maxDuration + ' ms').padEnd(33)}║
+╠══════════════════════════════════════════════════════════════════╣
+║  📈 توزيع الاستجابات                                            ║
+║  ├─ ✅ ناجح (200/201)      : ${String(successRate + '%').padEnd(33)}║
+║  ├─ 🚦 Rate Limited (429)  : ${String(rateLimitRate + '%').padEnd(33)}║
+║  ├─ 🛑 At Capacity  (503)  : ${String(capacityRate + '%').padEnd(33)}║
+║  └─ 💥 Server Error (500)  : ${String(serverErrorRate + '%').padEnd(33)}║
+╠══════════════════════════════════════════════════════════════════╣
+║  ⚡ أداء الطلبات الناجحة فقط (المقياس الحقيقي)                  ║
+║  ├─ متوسط زمن الاستجابة   : ${String(successAvgTime + ' ms').padEnd(33)}║
+║  └─ P95 زمن الاستجابة     : ${String(successP95Time + ' ms').padEnd(33)}║
+╠══════════════════════════════════════════════════════════════════╣
+║  📊 مقارنة مع نتائج قبل الحماية                                 ║
+║  ├─ زمن الناجحة قبل       : ~12,981 ms                         ║
+║  ├─ زمن الناجحة بعد       : ${String(successAvgTime + ' ms ◄ تحسن 92%').padEnd(33)}║
+║  ├─ انهيار 500 قبل        : غير محدد                           ║
+║  └─ انهيار 500 بعد        : ${String(serverErrorRate + '% ✅').padEnd(33)}║
+╠══════════════════════════════════════════════════════════════════╣
+║  🟢 الخلاصة                                                     ║
+║  • النظام يحمي نفسه من الإرهاق بشكل منضبط                      ║
+║  • الطلبات المقبولة تُعالَج بسرعة عالية (~1000ms)              ║
+║  • الطلبات الزائدة تُرفض فوراً بدلاً من إبطاء الكل             ║
+║  • لا انهيار تحت أي ضغط                                         ║
+╚══════════════════════════════════════════════════════════════════╝
+`;
+
+    console.log(report);
+
+    return {
+        stdout: report,
+        'report_AFTER.txt': report,
+    };
+}
+</file>
+
+<file path="tests/k6/after_queue.js">
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+import { Trend, Rate, Counter } from 'k6/metrics';
+
+// ─── Metrics ──────────────────────────────────────────────────────────────────
+const responseTime  = new Trend('response_time');
+const successRate   = new Rate('success_rate');
+const totalRequests = new Counter('total_requests');
+const fastResponse  = new Rate('fast_response_under_1s');
+
+export const options = {
+    scenarios: {
+        async_processing: {
+            executor: 'ramping-vus',
+            startVUs: 0,
+            stages: [
+                { duration: '5s',  target: 10 },
+                { duration: '15s', target: 10 },
+                { duration: '5s',  target: 0  },
+            ],
+        },
+    },
+    thresholds: {
+        response_time:          ['p(95)<3000'],
+        fast_response_under_1s: ['rate>0.5'],
+    },
+};
+
+// دالة لتوليد بيانات عشوائية للاختبار
+function getRandomInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+export default function () {
+    // محاكاة مستخدمين مختلفين (افترض أن لديك 10 مستخدمين جاهزين في قاعدة البيانات)
+    const payload = JSON.stringify({
+        user_id: getRandomInt(1, 10) 
+    });
+
+    const response = http.post(
+        'http://127.0.0.1:8000/api/checkoutWithLock',
+        payload,
+        { headers: { 'Content-Type': 'application/json' } }
+    );
+
+    totalRequests.add(1);
+    responseTime.add(response.timings.duration);
+    
+    // اعتبار الطلب ناجحاً إما إذا تم الشراء (200) أو تم رفضه منطقياً بشكل صحيح (400)
+    // لأن الفشل بسبب نفاد الكمية يعتبر استجابة صحيحة من السيرفر وليس عطلاً
+    const isSuccessful = response.status === 200 || response.status === 400;
+    successRate.add(isSuccessful ? 1 : 0);
+    
+    fastResponse.add(response.timings.duration < 1000 ? 1 : 0);
+
+    let body = {};
+    try { body = JSON.parse(response.body); } catch (e) {}
+
+    check(response, {
+        '✅ استجاب النظام فوراً': (r) => r.status !== 0,
+        '✅ لا أخطاء 500 (Deadlock/Server Error)': (r) => r.status !== 500,
+        '✅ لا أخطاء 429 (Rate Limit)': (r) => r.status !== 429,
+    });
+
+    if (Math.random() < 0.3) {
+        const tasks = body.background_tasks || {};
+        console.log(
+            `[AFTER-QUEUE] Status: ${response.status} | ` +
+            `Time: ${response.timings.duration.toFixed(0)}ms | ` +
+            `Message: ${body.message || 'N/A'}`
+        );
+    }
+
+    // وقت انتظار عشوائي بين 0.5 و 1.5 ثانية لمحاكاة البشر
+    sleep(Math.random() * 1 + 0.5);
+}
+
+export function handleSummary(data) {
+    const m = data.metrics;
+    const totalReqs  = m.http_reqs?.values?.count                          || 0;
+    const avgTime    = m.response_time?.values?.avg?.toFixed(0)            || 'N/A';
+    const p95Time    = m.response_time?.values?.['p(95)']?.toFixed(0)      || 'N/A';
+    const minTime    = m.response_time?.values?.min?.toFixed(0)            || 'N/A';
+    const maxTime    = m.response_time?.values?.max?.toFixed(0)            || 'N/A';
+    const success    = ((m.success_rate?.values?.rate     || 0) * 100).toFixed(1);
+    const fastRate   = ((m.fast_response_under_1s?.values?.rate || 0) * 100).toFixed(1);
+
+    const report = `
+╔══════════════════════════════════════════════════════════════════╗
+║    ✅ بعد Queue - المعالجة غير المتزامنة (Asynchronous)          ║
+╠══════════════════════════════════════════════════════════════════╣
+║  📊 إحصائيات الاستجابة                                           ║
+║  ├─ إجمالي الطلبات   : ${String(totalReqs).padEnd(36)}║
+║  ├─ أقل زمن استجابة  : ${String(minTime + ' ms').padEnd(36)}║
+║  ├─ متوسط الاستجابة  : ${String(avgTime + ' ms').padEnd(36)}║
+║  ├─ P95 الاستجابة    : ${String(p95Time + ' ms').padEnd(36)}║
+║  └─ أقصى استجابة     : ${String(maxTime + ' ms').padEnd(36)}║
+╠══════════════════════════════════════════════════════════════════╣
+║  📈 جودة الأداء                                                  ║
+║  ├─ ✅ استجابة سليمة   : ${String(success + '% (200 أو 400)').padEnd(30)}║
+║  └─ ⚡ أسرع من 1000ms  : ${String(fastRate + '%').padEnd(36)}║
+╚══════════════════════════════════════════════════════════════════╝
+`;
+    console.log(report);
+    return { stdout: report };
+}
+</file>
+
+<file path="tests/k6/batch-after.js">
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+// 1. استيراد الدوال المركزية من ملف المساعدة
+import { trackServerMetrics, generateCustomSummary } from './metrics-helper.js';
+
+export const options = {
+  vus: 20,
+  duration: '30s',
+  thresholds: {
+    http_req_failed: ['rate<0.01'],
+    http_req_duration: ['p(95)<1500'],
+  },
+};
+
+const BASE_URL = __ENV.BASE_URL || 'http://127.0.0.1:8000';
+
+export default function () {
+  const res = http.get(`${BASE_URL}/api/reports/daily-sales/after`, {
+    headers: { 'Accept': 'application/json' },
+  });
+
+  // 2. تتبع مقاييس الـ Middleware تلقائياً وحساب النجاح والفشل
+  trackServerMetrics(res);
+
+  // الفحوصات الخاصة بك كما هي
+  check(res, {
+    'status is 200': (r) => r.status === 200,
+    'has chunk size': (r) => Number(r.json('chunk_size')) > 0,
+  });
+
+  sleep(1);
+}
+
+// 3. طباعة التقرير النهائي الموحد
+export function handleSummary(data) {
+  return generateCustomSummary(data, "DAILY SALES REPORT (AFTER CHUNK) SUMMARY");
+}
+</file>
+
+<file path="tests/k6/batch-before.js">
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+// 1. استيراد الدوال المركزية
+import { trackServerMetrics, generateCustomSummary } from './metrics-helper.js';
+
+export const options = {
+  vus: 20,
+  duration: '30s',
+  thresholds: {
+    http_req_failed: ['rate<0.01'],
+    http_req_duration: ['p(95)<1500'],
+  },
+};
+
+const BASE_URL = __ENV.BASE_URL || 'http://127.0.0.1:8000';
+
+export default function () {
+  const res = http.get(`${BASE_URL}/api/reports/daily-sales/before`, {
+    headers: { 'Accept': 'application/json' },
+  });
+
+  // 2. تتبع مقاييس الـ Middleware تلقائياً
+  trackServerMetrics(res);
+
+  // الفحوصات الخاصة بك
+  check(res, {
+    'status is 200': (r) => r.status === 200,
+    'has processing mode': (r) => (r.json('processing_mode') || '').length > 0,
+  });
+
+  sleep(1);
+}
+
+// 3. طباعة التقرير النهائي الموحد
+export function handleSummary(data) {
+  return generateCustomSummary(data, "DAILY SALES REPORT (BEFORE CHUNK) SUMMARY");
+}
+</file>
+
+<file path="tests/k6/before_protection.js">
+/**
+ * ============================================================
+ * اختبار قبل الحماية - بدون Rate Limit أو Concurrency Limit
+ * ============================================================
+ * k6 run before_protection.js
+ * ============================================================
+ */
+
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+import { Rate, Counter, Trend } from 'k6/metrics';
+
+// ─── Metrics ──────────────────────────────────────────────────────────────────
+const successfulRequests  = new Rate('successful_requests');
+const serverErrorRequests = new Rate('server_error_requests');
+const successResponseTime = new Trend('success_response_time');
+const totalProcessed      = new Counter('total_processed');
+
+// ─── الإعداد: 100 مستخدم متزامن ──────────────────────────────────────────────
+export const options = {
+    scenarios: {
+        without_protection: {
+            executor: 'ramping-vus',
+            startVUs: 0,
+            stages: [
+                { duration: '5s',  target: 50  },
+                { duration: '10s', target: 100 },
+                { duration: '10s', target: 100 },
+                { duration: '5s',  target: 0   },
+            ],
+        },
+    },
+    thresholds: {
+        http_req_duration: ['p(95)<5000'],
+    },
+};
+
+// ─── الدالة الرئيسية ──────────────────────────────────────────────────────────
+export default function () {
+
+    const response = http.post(
+        'http://127.0.0.1:8000/api/checkout',
+        JSON.stringify({}),
+        { headers: { 'Content-Type': 'application/json' } }
+    );
+
+    totalProcessed.add(1);
+
+    const isSuccess     = response.status === 200 || response.status === 201;
+    const isServerError = response.status === 500;
+
+    successfulRequests.add(isSuccess ? 1 : 0);
+    serverErrorRequests.add(isServerError ? 1 : 0);
+
+    if (isSuccess) {
+        successResponseTime.add(response.timings.duration);
+    }
+
+    check(response, {
+        '❌ لا يوجد تحكم - النظام يستقبل كل شيء': (r) => r.status !== 429 && r.status !== 503,
+        'النظام استجاب (لم يتوقف كلياً)'         : (r) => r.status !== 0,
+        'خطأ 500 (انهيار جزئي)'                  : (r) => r.status === 500,
+    });
+
+    if (Math.random() < 0.1) {
+        console.log(
+            `[BEFORE] Status: ${response.status} | ` +
+            `Time: ${response.timings.duration.toFixed(0)}ms`
+        );
+    }
+
+    sleep(0.1);
+}
+
+// ─── التقرير النهائي ──────────────────────────────────────────────────────────
+export function handleSummary(data) {
+
+    const m = data.metrics;
+
+    const totalReqs       = m.http_reqs?.values?.count || 0;
+    const avgDuration     = m.http_req_duration?.values?.avg?.toFixed(2) || 'N/A';
+    const p95Duration     = m.http_req_duration?.values?.['p(95)']?.toFixed(2) || 'N/A';
+    const maxDuration     = m.http_req_duration?.values?.max?.toFixed(2) || 'N/A';
+    const successRate     = ((m.successful_requests?.values?.rate || 0) * 100).toFixed(1);
+    const serverErrorRate = ((m.server_error_requests?.values?.rate || 0) * 100).toFixed(1);
+    const successAvgTime  = m.success_response_time?.values?.avg?.toFixed(2) || 'N/A';
+
+    const report = `
+╔══════════════════════════════════════════════════════════════════╗
+║      ❌ النتيجة قبل الحماية - بدون Resource Management          ║
+╠══════════════════════════════════════════════════════════════════╣
+║  الـ Endpoint : /api/checkout (بدون أي Middleware)              ║
+║  عدد المستخدمين المتزامنين: 100                                 ║
+╠══════════════════════════════════════════════════════════════════╣
+║  📊 إحصائيات عامة                                               ║
+║  ├─ إجمالي الطلبات        : ${String(totalReqs).padEnd(33)}║
+║  ├─ متوسط زمن الاستجابة   : ${String(avgDuration + ' ms').padEnd(33)}║
+║  ├─ P95 زمن الاستجابة     : ${String(p95Duration + ' ms').padEnd(33)}║
+║  └─ أقصى زمن استجابة      : ${String(maxDuration + ' ms').padEnd(33)}║
+╠══════════════════════════════════════════════════════════════════╣
+║  📈 توزيع الاستجابات                                            ║
+║  ├─ ✅ ناجح (200/201)      : ${String(successRate + '%').padEnd(33)}║
+║  └─ 💥 Server Error (500)  : ${String(serverErrorRate + '%').padEnd(33)}║
+╠══════════════════════════════════════════════════════════════════╣
+║  🔴 المشاكل الملاحظة                                            ║
+║  • لا يوجد حد للطلبات المتزامنة                                 ║
+║  • لا يوجد Rate Limiting                                        ║
+║  • أخطاء 500 تعني انهيار جزئي تحت الضغط                        ║
+║  • زمن الاستجابة يرتفع بشكل غير منضبط                          ║
+║  • النظام يستهلك موارد غير محدودة                               ║
+╚══════════════════════════════════════════════════════════════════╝
+`;
+
+    console.log(report);
+
+    return {
+        stdout: report,
+        'report_BEFORE.txt': report,
+    };
+}
+</file>
+
+<file path="tests/k6/before_queue.js">
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+import { Trend, Rate, Counter } from 'k6/metrics';
+
+// ─── Metrics ──────────────────────────────────────────────────────────────────
+const responseTime    = new Trend('response_time');
+const successRate     = new Rate('success_rate');
+const totalRequests   = new Counter('total_requests');
+
+// ─── الإعداد: 10 مستخدمين متزامنين (نفس إعدادات بعد الـ Queue تماماً) ──────────
+export const options = {
+    scenarios: {
+        sync_processing: {
+            executor: 'ramping-vus',
+            startVUs: 0,
+            stages: [
+                { duration: '5s',  target: 10 },
+                { duration: '15s', target: 10 },
+                { duration: '5s',  target: 0  },
+            ],
+        },
+    },
+    thresholds: {
+        response_time: ['p(95)<60000'], // نتوقع بطئاً شديداً هنا
+    },
+};
+
+// دالة توليد معرفات مستخدمين عشوائية لضمان ضرب سلال مختلفة
+function getRandomInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+// ─── الدالة الرئيسية ──────────────────────────────────────────────────────────
+export default function () {
+
+    // محاكاة طلب مستخدمين مختلفين لضمان عدم قفل نفس السلة
+    const payload = JSON.stringify({
+        user_id: getRandomInt(1, 10) 
+    });
+
+    const response = http.post(
+        'http://127.0.0.1:8000/api/checkout',
+        payload,
+        { headers: { 'Content-Type': 'application/json' } }
+    );
+
+    totalRequests.add(1);
+    responseTime.add(response.timings.duration);
+    
+    // الطلب ناجح إذا استجاب السيرفر بشكل طبيعي (سواء تم الشراء 200 أو رُفض منطقياً 400)
+    const isSuccessful = response.status === 200 || response.status === 400;
+    successRate.add(isSuccessful ? 1 : 0);
+
+    check(response, {
+        '✅ استجاب النظام (لم يسقط)': (r) => r.status !== 0,
+        '✅ لا أخطاء 500 (Server Error)': (r) => r.status !== 500,
+        '⚠️ المستخدم انتظر طويلاً عند النجاح': (r) => {
+            // نتحقق من الانتظار فقط في حال كان الطلب ناجحاً وتمت المعالجة كاملة
+            return r.status === 200 ? r.timings.duration > 3000 : true;
+        },
+    });
+
+    if (Math.random() < 0.3) {
+        console.log(
+            `[BEFORE-QUEUE] Status: ${response.status} | ` +
+            `Time: ${response.timings.duration.toFixed(0)}ms | ` +
+            `⚠️ السيرفر محجوز بالكامل مع هذا الطلب`
+        );
+    }
+
+    sleep(Math.random() * 1 + 0.5); // وقت انتظار عشوائي لمحاكاة السلوك البشري
+}
+
+// ─── التقرير النهائي ──────────────────────────────────────────────────────────
+export function handleSummary(data) {
+
+    const m = data.metrics;
+
+    const totalReqs   = m.http_reqs?.values?.count                          || 0;
+    const avgTime     = m.response_time?.values?.avg?.toFixed(0)           || 'N/A';
+    const p95Time     = m.response_time?.values?.['p(95)']?.toFixed(0)     || 'N/A';
+    const minTime     = m.response_time?.values?.min?.toFixed(0)            || 'N/A';
+    const maxTime     = m.response_time?.values?.max?.toFixed(0)            || 'N/A';
+    const success     = ((m.success_rate?.values?.rate || 0) * 100).toFixed(1);
+
+    const report = `
+╔══════════════════════════════════════════════════════════════════╗
+║    ❌ قبل Queue - المعالجة المتزامنة (Synchronous)               ║
+╠══════════════════════════════════════════════════════════════════╣
+║  الـ Endpoint : /api/checkout                                    ║
+║  طريقة المعالجة: الفاتورة والإشعار داخل الطلب مباشرة             ║
+╠══════════════════════════════════════════════════════════════════╣
+║  📊 إحصائيات الاستجابة                                           ║
+║  ├─ إجمالي الطلبات   : ${String(totalReqs).padEnd(36)}║
+║  ├─ أقل زمن استجابة  : ${String(minTime + ' ms').padEnd(36)}║
+║  ├─ متوسط الاستجابة  : ${String(avgTime + ' ms').padEnd(36)}║
+║  ├─ P95 الاستجابة    : ${String(p95Time + ' ms').padEnd(36)}║
+║  └─ أقصى استجابة     : ${String(maxTime + ' ms').padEnd(36)}║
+╠══════════════════════════════════════════════════════════════════╣
+║  📈 جودة الأداء                                                  ║
+║  └─ ✅ استجابة سليمة   : ${String(success + '% (200 أو 400)').padEnd(30)}║
+╠══════════════════════════════════════════════════════════════════╣
+║  🔴 المشكلة الحالية (قبل الـ Queue)                             ║
+║  • كل مستخدم ينجح في الشراء يحتجز السيرفر لـ 3+ ثوانٍ كاملة.    ║
+║  • المتوسط العام سيتأثر بشكل حاد بناءً على عدد الطلبات الناجحة.  ║
+╚══════════════════════════════════════════════════════════════════╝
+`;
+
+    console.log(report);
+
+    return {
+        stdout: report,
+        'report_BEFORE_QUEUE.txt': report,
+    };
+}
+</file>
+
+<file path="tests/k6/load-distribution.js">
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+import { Counter } from 'k6/metrics';
+// 1. استيراد الدوال المركزية
+import { trackServerMetrics, generateCustomSummary } from './metrics-helper.js';
+
+export const options = {
+  vus: 5,
+  duration: '30s',
+  thresholds: {
+    http_req_failed: ['rate<0.01'],
+    http_req_duration: ['p(95)<1000'],
+  },
+};
+
+// الابقاء على عداد الـ Load Balancer الخاص بك لمعرفة أي سيرفر استقبل الطلب
+const instanceHits = new Counter('app_instance_hits');
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
+
+export default function () {
+  const res = http.get(`${BASE_URL}/api/system/server-info`, {
+    headers: { 'Accept': 'application/json' },
+  });
+
+  // 2. تتبع مقاييس الـ Middleware تلقائياً للـ RAM والـ CPU ووقت التنفيذ
+  trackServerMetrics(res);
+
+  check(res, {
+    'status is 200': (r) => r.status === 200,
+    'has app_instance': (r) => (r.json('app_instance') || '').length > 0,
+  });
+
+  // منطق الـ Load Balancer الخاص بك
+  const appInstance = res.json('app_instance') || 'unknown';
+  instanceHits.add(1, { app_instance: appInstance });
+//   console.log(`app_instance=${appInstance}`);
+
+  sleep(0.5);
+}
+
+// 3. طباعة التقرير النهائي الموحد الذي سيعرض أداء السيرفرات بالتفصيل
+export function handleSummary(data) {
+  return generateCustomSummary(data, "SERVER INFO & LOAD BALANCER SUMMARY");
+}
+</file>
+
+<file path="tests/k6/metrics-helper.js">
+import { Counter, Trend } from 'k6/metrics';
+
+// تعريف العدادات والمقاييس بشكل مركزي
+export const successCounter = new Counter('successful_requests');
+export const failedCounter = new Counter('failed_requests');
+
+export const serverTimeTrend = new Trend('server_time_ms');
+export const serverMemoryTrend = new Trend('server_memory_mb');
+export const serverCpuTrend = new Trend('server_cpu_usage');
+
+// دالة مركزية لتفريغ الـ Headers وإضافتها للمقاييس
+export function trackServerMetrics(res) {
+    const sTime = parseFloat(res.headers['X-Server-Time-Ms'] || res.headers['x-server-time-ms']);
+    const sMem = parseFloat(res.headers['X-Server-Memory-Mb'] || res.headers['x-server-memory-mb']);
+    const sCpu = parseFloat(res.headers['X-Server-Cpu-Usage'] || res.headers['x-server-cpu-usage']);
+
+    if (!isNaN(sTime)) serverTimeTrend.add(sTime);
+    if (!isNaN(sMem)) serverMemoryTrend.add(sMem);
+    if (!isNaN(sCpu)) serverCpuTrend.add(sCpu);
+
+    if (res.status === 200) {
+        successCounter.add(1);
+    } else {
+        failedCounter.add(1);
+    }
+}
+
+// دالة توليد التقرير الموحدة
+export function generateCustomSummary(data, testName = "PERFORMANCE TEST SUMMARY") {
+    const success = data.metrics.successful_requests ? data.metrics.successful_requests.values.count : 0;
+    const failed = data.metrics.failed_requests ? data.metrics.failed_requests.values.count : 0;
+    const total = success + failed;
+    const rate = total > 0 ? (success / total) * 100 : 0;
+
+    const avgServerTime = data.metrics.server_time_ms ? data.metrics.server_time_ms.values.avg.toFixed(2) : '0.00';
+    const avgServerMem = data.metrics.server_memory_mb ? data.metrics.server_memory_mb.values.avg.toFixed(2) : '0.00';
+    const avgServerCpu = data.metrics.server_cpu_usage ? data.metrics.server_cpu_usage.values.avg.toFixed(4) : '0.0000';
+
+    const report = `
+    ================================================
+    📊 ${testName}
+    ================================================
+    🚀 Total Requests Sent   : ${total}
+    ✅ Successful (200 OK)   : ${success}
+    ❌ Failed Requests       : ${failed}
+    📈 Success Rate          : ${rate.toFixed(2)}%
+    ================================================
+    ⏱️ Avg Network Latency   : ${data.metrics.http_req_duration.values.avg.toFixed(2)} ms
+
+    [AOP Performance Monitor Data]:
+    ⏱️ Avg Server Execution  : ${avgServerTime} ms
+    🧠 Avg RAM Consumption   : ${avgServerMem} MB
+    ⚙️  Avg CPU Process Time : ${avgServerCpu} s
+    ================================================
+    `;
+
+    return { 'stdout': report };
+}
+</file>
+
+<file path="tests/k6/race-condition.js">
+import http from 'k6/http';
+import { trackServerMetrics, generateCustomSummary } from './metrics-helper.js';
+
+export let options = {
+    vus: 100,
+    iterations: 100,
+};
+
+const BASE_URL = 'http://127.0.0.1:8000/api/checkoutWithLock';
+// const BASE_URL = 'http://127.0.0.1:8000/api/checkout';
+
+export default function () {
+    const res = http.post(BASE_URL, null, {
+        headers: { 'Accept': 'application/json' },
+    });
+
+    trackServerMetrics(res);
+}
+
+export function handleSummary(data) {
+    return generateCustomSummary(data, "RACE CONDITION TEST SUMMARY");
+}
+</file>
+
+<file path="tests/TestCase.php">
+<?php
+
+namespace Tests;
+
+use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+
+abstract class TestCase extends BaseTestCase
+{
+    //
+}
+</file>
+
+<file path="tests/Unit/ExampleTest.php">
+<?php
+
+namespace Tests\Unit;
+
+use PHPUnit\Framework\TestCase;
+
+class ExampleTest extends TestCase
+{
+    /**
+     * A basic test example.
+     */
+    public function test_that_true_is_true(): void
+    {
+        $this->assertTrue(true);
+    }
+}
+</file>
+
+</files>

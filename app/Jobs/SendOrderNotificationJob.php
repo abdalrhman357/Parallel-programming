@@ -9,33 +9,21 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
-/**
- * ============================================================
- * SendOrderNotificationJob - مهمة إرسال الإشعار
- * ============================================================
- */
+
 class SendOrderNotificationJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    /**
-     * عدد المحاولات عند الفشل
-     */
+
     public int $tries = 3;
 
-    /**
-     * وقت الانتظار بين المحاولات
-     */
+
     public int $backoff = 10;
 
-    /**
-     * أقصى وقت للتنفيذ
-     */
+
     public int $timeout = 60;
 
-    /**
-     * بيانات الإشعار
-     */
+
     public function __construct(
         public int $orderId,
         public int $userId,
@@ -43,12 +31,10 @@ class SendOrderNotificationJob implements ShouldQueue
         public float $totalPrice,
     ) {}
 
-    /**
-     * تنفيذ المهمة
-     */
+
     public function handle(): void
     {
-        // تسجيل بداية التنفيذ
+
         Log::channel('daily')->info(
             'SendOrderNotificationJob: بدء إرسال الإشعار',
             [
@@ -58,13 +44,13 @@ class SendOrderNotificationJob implements ShouldQueue
             ]
         );
 
-        // إنشاء بيانات الإشعار
+
         $notification = $this->buildNotification();
 
-        // محاكاة تأخير الإرسال
+
         sleep(1);
 
-        // تسجيل نجاح العملية
+
         Log::channel('daily')->info(
             'SendOrderNotificationJob: تم إرسال الإشعار بنجاح',
             [
@@ -76,9 +62,7 @@ class SendOrderNotificationJob implements ShouldQueue
         );
     }
 
-    /**
-     * بناء بيانات الإشعار
-     */
+
     private function buildNotification(): array
     {
         return [
@@ -98,9 +82,7 @@ class SendOrderNotificationJob implements ShouldQueue
         ];
     }
 
-    /**
-     * عند الفشل النهائي
-     */
+ 
     public function failed(\Throwable $exception): void
     {
         Log::channel('daily')->error(

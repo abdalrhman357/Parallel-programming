@@ -20,7 +20,6 @@ class SafeOrderController extends Controller
     $cart = Cart::where('user_id', $user->id)->firstOrFail();
     $items = CartItem::where('cart_id', $cart->id)->get();
 
-    // 1. حساب الإجمالي أولاً بدون أي تعديل
     $total = 0;
 
     foreach ($items as $item) {
@@ -28,7 +27,6 @@ class SafeOrderController extends Controller
         $total += $product->price * $item->quantity;
     }
 
-    // 2. تحقق من الرصيد قبل أي تعديل
     if ($user->wallet_balance < $total) {
         return response()->json([
             'message' => 'Not enough balance'
@@ -41,13 +39,11 @@ class SafeOrderController extends Controller
 
         $locks = [];
 
-        // 3. قفل المنتجات
         foreach ($items as $item) {
             $locks[$item->product_id] = Cache::lock('product_'.$item->product_id, 10);
             $locks[$item->product_id]->block(5);
         }
 
-        // 4. إعادة التحقق من المخزون (مهم جدًا ضد race condition)
         foreach ($items as $item) {
 
             $product = Product::findOrFail($item->product_id);
@@ -58,7 +54,6 @@ class SafeOrderController extends Controller
             }
         }
 
-        // 5. خصم المخزون
         foreach ($items as $item) {
 
             $product = Product::find($item->product_id);
@@ -66,11 +61,9 @@ class SafeOrderController extends Controller
             $product->save();
         }
 
-        // 6. خصم الرصيد مرة واحدة
         $user->wallet_balance -= $total;
         $user->save();
 
-        // 7. إنشاء الطلب
         $order = Order::create([
             'user_id' => $user->id,
             'total_price' => $total,
@@ -126,7 +119,6 @@ class SafeOrderController extends Controller
 
     } finally {
 
-        // تحرير كل الـ locks
         if (!empty($locks)) {
             foreach ($locks as $lock) {
                 optional($lock)->release();
