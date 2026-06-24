@@ -1,0 +1,19 @@
+
+================================================
+  REQ1 RACE BEFORE (no lock)
+================================================
+  Total Requests        : 100
+  Accepted (200/201)    : 24   (24.0%)
+  Rejected 429 (rate)   : 0
+  Rejected 503 (full)   : 0
+  Business reject (400) : 76
+  Server Errors (500)   : 0
+  Logical OK Rate       : 100.0%
+  Avg Network Latency   : 304.72 ms
+  P95 Network Latency   : 327.74 ms
+  --- AOP (server-side) ---
+  Avg Server Exec Time  : 9.88 ms
+  Avg RAM Consumption   : 0.25 MB
+  Avg CPU Process Time  : 0.0019 s
+  ⚠️ تحقق يدوياً: SELECT stock_quantity FROM products  → غالباً قيمة سالبة (oversell)
+================================================

@@ -1,0 +1,19 @@
+
+================================================
+  REQ3 QUEUE AFTER (async jobs)
+================================================
+  Total Requests        : 248
+  Accepted (200/201)    : 248   (100.0%)
+  Rejected 429 (rate)   : 0
+  Rejected 503 (full)   : 0
+  Business reject (400) : 0
+  Server Errors (500)   : 0
+  Logical OK Rate       : 100.0%
+  Avg Network Latency   : 1028.12 ms
+  P95 Network Latency   : 1112.48 ms
+  --- AOP (server-side) ---
+  Avg Server Exec Time  : 53.27 ms
+  Avg RAM Consumption   : 6.10 MB
+  Avg CPU Process Time  : 0.0213 s
+  ℹ️ المستخدم يرجع فوراً؛ المهام (3s) تُنفَّذ لاحقاً في نافذة queue:work
+================================================

@@ -1,0 +1,19 @@
+
+================================================
+  REQ5 LOAD AFTER (load balanced)
+================================================
+  Total Requests        : 10365
+  Accepted (200/201)    : 10365   (100.0%)
+  Rejected 429 (rate)   : 0
+  Rejected 503 (full)   : 0
+  Business reject (400) : 0
+  Server Errors (500)   : 0
+  Logical OK Rate       : 100.0%
+  Avg Network Latency   : 43.80 ms
+  P95 Network Latency   : 368.21 ms
+  --- AOP (server-side) ---
+  Avg Server Exec Time  : 0.29 ms
+  Avg RAM Consumption   : 0.07 MB
+  Avg CPU Process Time  : 0.0003 s
+  ℹ️ راجع app_instance_hits لكل instance لرؤية التوزيع
+================================================

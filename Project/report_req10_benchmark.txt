@@ -1,0 +1,9 @@
+
+================================================
+  REQ10 BENCHMARK (Cache Before vs After)
+================================================
+  Check the console output above:
+  - before_cache.avg_ms   (Database query = bottleneck)
+  - after_cache.avg_ms    (Cache read)
+  - improvement_percent   (Performance improvement)
+================================================

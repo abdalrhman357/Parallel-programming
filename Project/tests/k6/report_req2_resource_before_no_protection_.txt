@@ -1,0 +1,18 @@
+
+================================================
+  REQ2 RESOURCE BEFORE (no protection)
+================================================
+  Total Requests        : 19427
+  Accepted (200/201)    : 17665   (90.9%)
+  Rejected 429 (rate)   : 0
+  Rejected 503 (full)   : 0
+  Business reject (400) : 1762
+  Server Errors (500)   : 0
+  Logical OK Rate       : 100.0%
+  Avg Network Latency   : 109.26 ms
+  P95 Network Latency   : 266.25 ms
+  --- AOP (server-side) ---
+  Avg Server Exec Time  : 10.41 ms
+  Avg RAM Consumption   : 0.01 MB
+  Avg CPU Process Time  : 0.0023 s
+================================================

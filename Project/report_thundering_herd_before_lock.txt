@@ -1,0 +1,19 @@
+
+================================================
+  THUNDERING HERD - BEFORE LOCK
+================================================
+  Total Requests        : 1000
+  Accepted (200/201)    : 1000   (100.0%)
+  Rejected 429 (rate)   : 0
+  Rejected 503 (full)   : 0
+  Business reject (400) : 0
+  Server Errors (500)   : 0
+  Logical OK Rate       : 100.0%
+  Avg Network Latency   : 1791.89 ms
+  P95 Network Latency   : 2043.89 ms
+  --- AOP (server-side) ---
+  Avg Server Exec Time  : 42.68 ms
+  Avg RAM Consumption   : 4.02 MB
+  Avg CPU Process Time  : 0.0253 s
+  ❌ Huge concurrent stampede: Server regenerates the heavy report for every single parallel request
+================================================

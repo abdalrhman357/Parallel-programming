@@ -1,0 +1,18 @@
+
+================================================
+  REQ8 ACID BEFORE (non-atomic)
+================================================
+  Total Requests        : 80
+  Accepted (200/201)    : 80   (100.0%)
+  Rejected 429 (rate)   : 0
+  Rejected 503 (full)   : 0
+  Business reject (400) : 0
+  Server Errors (500)   : 0
+  Logical OK Rate       : 100.0%
+  Avg Network Latency   : 7140.34 ms
+  P95 Network Latency   : 9472.53 ms
+  --- AOP (server-side) ---
+  Avg Server Exec Time  : 88.49 ms
+  Avg RAM Consumption   : 4.43 MB
+  Avg CPU Process Time  : 0.0381 s
+================================================

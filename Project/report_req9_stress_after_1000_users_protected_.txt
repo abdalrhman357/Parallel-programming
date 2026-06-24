@@ -1,0 +1,18 @@
+
+================================================
+  REQ9 STRESS AFTER (1000 users, protected)
+================================================
+  Total Requests        : 35
+  Accepted (200/201)    : 0   (0.0%)
+  Rejected 429 (rate)   : 0
+  Rejected 503 (full)   : 0
+  Business reject (400) : 1
+  Server Errors (500)   : 34
+  Logical OK Rate       : 0.0%
+  Avg Network Latency   : 765.14 ms
+  P95 Network Latency   : 0.00 ms
+  --- AOP (server-side) ---
+  Avg Server Exec Time  : 2029.87 ms
+  Avg RAM Consumption   : 3.15 MB
+  Avg CPU Process Time  : 0.0295 s
+================================================

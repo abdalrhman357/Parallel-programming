@@ -1,0 +1,18 @@
+
+================================================
+  REQ4 BATCH BEFORE (no chunking)
+================================================
+  Total Requests        : 88
+  Accepted (200/201)    : 0   (0.0%)
+  Rejected 429 (rate)   : 0
+  Rejected 503 (full)   : 0
+  Business reject (400) : 0
+  Server Errors (500)   : 88
+  Logical OK Rate       : 0.0%
+  Avg Network Latency   : 7687.41 ms
+  P95 Network Latency   : 9996.86 ms
+  --- AOP (server-side) ---
+  Avg Server Exec Time  : N/A ms
+  Avg RAM Consumption   : N/A MB
+  Avg CPU Process Time  : N/A s
+================================================

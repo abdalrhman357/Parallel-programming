@@ -1,0 +1,19 @@
+
+================================================
+  THUNDERING HERD - AFTER LOCK (Redis distributed lock)
+================================================
+  Total Requests        : 1000
+  Accepted (200/201)    : 1000   (100.0%)
+  Rejected 429 (rate)   : 0
+  Rejected 503 (full)   : 0
+  Business reject (400) : 0
+  Server Errors (500)   : 0
+  Logical OK Rate       : 100.0%
+  Avg Network Latency   : 2187.56 ms
+  P95 Network Latency   : 2350.36 ms
+  --- AOP (server-side) ---
+  Avg Server Exec Time  : 66.44 ms
+  Avg RAM Consumption   : 2.60 MB
+  Avg CPU Process Time  : 0.0251 s
+  ✅ Distributed lock successfully serialized execution and protected CPU via cache/423 throttling
+================================================

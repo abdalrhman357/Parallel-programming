@@ -1,0 +1,19 @@
+
+================================================
+  REQ7 LOCK AFTER (Redis distributed lock)
+================================================
+  Total Requests        : 100
+  Accepted (200/201)    : 5   (5.0%)
+  Rejected 429 (rate)   : 0
+  Rejected 503 (full)   : 0
+  Business reject (400) : 95
+  Server Errors (500)   : 0
+  Logical OK Rate       : 100.0%
+  Avg Network Latency   : 8304.30 ms
+  P95 Network Latency   : 11016.62 ms
+  --- AOP (server-side) ---
+  Avg Server Exec Time  : 83.56 ms
+  Avg RAM Consumption   : 4.99 MB
+  Avg CPU Process Time  : 0.0433 s
+  ✅ لا أخطاء 500 = لا deadlock؛ القفل الموزّع يسلسل الوصول
+================================================
